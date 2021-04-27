@@ -22,7 +22,7 @@ generateReadmeFile = do
   tuples <- mkTuplesFromAllFiles mdFiles
   tagsData <- pure $ generateTagsData tuples
   sortedTagsData <- pure $ sortTagsData tagsData
-  contentToWrite <- pure $ formatTagsData tagsData
+  contentToWrite <- pure $ formatTagsData sortedTagsData
   writeTextFile UTF8 "readme.md" contentToWrite
 
 initObject :: Object.Object (Array String)
@@ -109,8 +109,15 @@ sortTagsData obj =
   in
     fromFoldable sortedArrayFromObj
 
+-- sometuples = [
+--   (Tuple "yacht" []),
+--   (Tuple "zebra" []),
+--   (Tuple "banana" []),
+--   (Tuple "apple" [])
+-- ]
+
 sortTags :: Array (Tuple String (Array String)) -> Array (Tuple String (Array String))
 sortTags [] = []
 sortTags xs = sortBy sortFn xs
   where
-    sortFn (Tuple a _) (Tuple b _) = compare a b
+    sortFn (Tuple a _) (Tuple b _) = if (a < b) then GT else LT
