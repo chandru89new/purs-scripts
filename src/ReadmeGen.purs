@@ -1,8 +1,8 @@
-module ReadmeGen (generateReadmeFile) where
+module ReadmeGen where
 
 import Prelude
 
-import Data.Array (filter, find, foldr, length)
+import Data.Array (filter, find, foldr, length, sortBy)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (contains, joinWith, replace, split, toLower)
 import Data.String.Pattern (Pattern(..), Replacement(..))
@@ -10,10 +10,20 @@ import Data.String.Utils (lines)
 import Data.Traversable (sequence)
 import Data.Tuple (Tuple(..), fst, snd)
 import Effect (Effect)
-import Effect.Console (log)
+import Foreign.Object (fromFoldable, toUnfoldable)
 import Foreign.Object as Object
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync (readTextFile, readdir, writeTextFile)
+
+generateReadmeFile :: Effect Unit
+generateReadmeFile = do
+  files <- readdir "."
+  mdFiles <- pure $ filter (contains (Pattern ".md")) files
+  tuples <- mkTuplesFromAllFiles mdFiles
+  tagsData <- pure $ generateTagsData tuples
+  sortedTagsData <- pure $ sortTagsData tagsData
+  contentToWrite <- pure $ formatTagsData tagsData
+  writeTextFile UTF8 "readme.md" contentToWrite
 
 initObject :: Object.Object (Array String)
 initObject = Object.empty
@@ -91,13 +101,16 @@ formatTagsData obj = foldr toTagSection initString (Object.keys obj)
       in
         text <> "**" <> key <> "**" <> "\n- " <> fileListAsString <> "\n\n"
 
-generateReadmeFile :: Effect Unit
-generateReadmeFile = do
-  files <- readdir "."
-  mdFiles <- pure $ filter (contains (Pattern ".md")) files
-  tuples <- mkTuplesFromAllFiles mdFiles
-  tagsData <- pure $ generateTagsData tuples
-  contentToWrite <- pure $ formatTagsData tagsData
-  _ <- writeTextFile UTF8 "readme.md" contentToWrite
-  log "Done"
-  
+sortTagsData :: Object.Object (Array String) -> Object.Object (Array String)
+sortTagsData obj =
+  let
+    arrayFromObj = toUnfoldable obj
+    sortedArrayFromObj = sortTags arrayFromObj
+  in
+    fromFoldable sortedArrayFromObj
+
+sortTags :: Array (Tuple String (Array String)) -> Array (Tuple String (Array String))
+sortTags [] = []
+sortTags xs = sortBy sortFn xs
+  where
+    sortFn (Tuple a _) (Tuple b _) = compare a b
